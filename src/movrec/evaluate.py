@@ -40,7 +40,11 @@ def top_k(scores: np.ndarray, revealed: np.ndarray, k: int) -> np.ndarray:
     return np.argsort(-s, axis=1, kind="stable")[:, :k]
 
 
-def per_case_metrics(scores: np.ndarray, cases: Cases, ks=(3, 5), map_k: int = 5) -> pd.DataFrame:
+def per_case_metrics(scores: np.ndarray, cases: Cases, ks=(3, 5), map_k: int = 5,
+                     categories: np.ndarray | None = None) -> pd.DataFrame:
+    """Per-case HR@k, Recall@k, MAP@map_k. With `categories` (one label per item), also
+    category HR@k: a hit if a top-k item shares a category with any hidden item
+    (e.g. the 25 in wardrobe box when the customer bought the 20 in)."""
     max_k = max(max(ks), map_k)
     top = top_k(scores, cases.revealed, max_k)
     rel = np.take_along_axis(cases.hidden, top, axis=1)          # cases x max_k, bool
@@ -54,6 +58,14 @@ def per_case_metrics(scores: np.ndarray, cases: Cases, ks=(3, 5), map_k: int = 5
     r = rel[:, :map_k]
     precision_at_i = r.cumsum(axis=1) / np.arange(1, map_k + 1)
     out[f"map@{map_k}"] = (precision_at_i * r).sum(axis=1) / np.minimum(n_hidden, map_k)
+    if categories is not None:
+        codes, cat = np.unique(np.asarray(categories), return_inverse=True)
+        hidden_cat = np.zeros((len(top), len(codes)), dtype=bool)
+        rows, items = np.nonzero(cases.hidden)
+        hidden_cat[rows, cat[items]] = True
+        for k in ks:
+            top_cat = cat[top[:, :k]]
+            out[f"cat_hr@{k}"] = np.take_along_axis(hidden_cat, top_cat, axis=1).any(axis=1).astype(float)
     df = pd.DataFrame(out)
     df["cart_size"] = cases.cart_size
     return df

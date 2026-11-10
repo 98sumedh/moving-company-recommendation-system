@@ -1,7 +1,7 @@
 PY ?= .venv/bin/python
 SEED ?= 42
 
-.PHONY: setup data report docs baselines als content hybrid test all
+.PHONY: setup data report docs baselines als content hybrid evaluation test all
 
 setup:
 	python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
@@ -27,7 +27,10 @@ content:
 hybrid:
 	PYTHONPATH=src $(PY) -m movrec.run_hybrid
 
+evaluation:
+	PYTHONPATH=src $(PY) -m movrec.run_evaluation
+
 test:
 	$(PY) -m pytest -q
 
-all: data report docs baselines als content hybrid test
+all: data report docs baselines als content hybrid evaluation test

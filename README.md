@@ -28,7 +28,7 @@ the norm: recommendations must come from the move profile and the partial cart, 
 | 3 | Implicit ALS + least-squares fold-in for partial carts | done ([report](reports/als.md)) |
 | 4 | Content kNN on move-profile vectors (empty carts) | done ([report](reports/content.md)) |
 | 5 | Hybrid, weights tuned on validation | done ([report](reports/hybrid.md)) |
-| 6 | Offline evaluation (HR/Recall@3,5, MAP; ablations; by cart size) | planned |
+| 6 | Offline evaluation (HR/Recall@3,5, MAP; ablations; by cart size) | done ([report](reports/evaluation.md)) |
 | 7 | Write-up and limitations | planned |
 
 ## Quick start
@@ -42,6 +42,7 @@ make baselines # step 2: writes reports/baselines.md and results/baselines.json
 make als       # step 3: writes reports/als.md and results/als.json (a few minutes)
 make content   # step 4: writes reports/content.md and results/content.json (~2 min)
 make hybrid    # step 5: writes reports/hybrid.md and results/hybrid.json (~1 min)
+make evaluation # step 6: writes reports/evaluation.md and results/evaluation.json (~2 min)
 make test
 ```
 

@@ -44,3 +44,11 @@ def test_summary_slices():
     table = summarize(per_case, slices=(0, 1, 2, 3))
     assert list(table.index) == ["all", "3+"]
     assert table.loc["all", "cases"] == 1
+
+
+def test_category_hit_counts_a_sibling_variant():
+    cases = toy_case(hidden_items=[1], revealed_items=[])
+    cats = np.array(["wardrobe", "wardrobe", "tape", "tape", "x", "y"])
+    scores = np.array([[0.9, 0.0, 0.8, 0.0, 0.0, 0.0]])        # top-1 is item 0, sibling of hidden item 1
+    m = per_case_metrics(scores, cases, ks=(1,), map_k=1, categories=cats).iloc[0]
+    assert m["hr@1"] == 0 and m["cat_hr@1"] == 1
