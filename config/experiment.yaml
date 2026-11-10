@@ -1,0 +1,30 @@
+# Modeling and evaluation settings (steps 2-6). Separate from assumptions.yaml,
+# which only drives the data generator.
+
+split:
+  # Split on booking_ts: a model may only learn from bookings made before the one it scores.
+  # train  : bookings made before 2026-01-01 (covers the summer 2025 peak)
+  # val    : Jan-Mar 2026 (winter/spring; used for all tuning)
+  # test   : Apr-Sep 2026 (the summer 2026 peak; touched once per model, after tuning)
+  val_start: "2026-01-01"
+  test_start: "2026-04-01"
+
+evaluation:
+  seed: 2026
+  ks: [3, 5]
+  map_k: 5
+  # One case per booking with >= 1 target item: reveal a random subset of size
+  # k ~ Uniform{0, ..., n_items - 1} as the partial cart; the rest are the hidden targets.
+  cart_size_slices: [0, 1, 2, 3]   # 3 means "3 or more"
+  # Two target sets: all 45 services, and add-ons only (truck columns dropped everywhere),
+  # because home size nearly decides the truck.
+  target_sets: [all, no_truck]
+
+baselines:
+  segment_keys: [move_type, home_size]      # observable "segment", not the hidden one
+  # Backoff strength toward global popularity for small segments (tuned on val).
+  segment_alpha_grid: [0, 5, 20, 100, 500]
+  # Co-occurrence: score(j) = mean over cart items i of P(j | i), plus a small
+  # segment-popularity term to break ties and to rank empty carts.
+  # Grid widened after the first run picked its top edge (1.0); choice is still made on val.
+  cooc_prior_weight_grid: [0.01, 0.1, 0.3, 1.0, 3.0, 10.0]
