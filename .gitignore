@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+.DS_Store
+# generated data is reproducible from the seed; only the manifest is committed
+data/*
+!data/MANIFEST.json

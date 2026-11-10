@@ -1,0 +1,30 @@
+{
+  "synthetic": true,
+  "seed": 42,
+  "generator": {
+    "commit": null,
+    "dirty": true
+  },
+  "files": {
+    "services.csv": {
+      "rows": 45,
+      "sha256": "ca095baf063ad3332275804a19c7b80d18fd7971c9182459f4fcf8f74a378baf"
+    },
+    "customers.csv": {
+      "rows": 47299,
+      "sha256": "772732aa19afd22def0e70831b41d10791cfb9505884659d5a9365a349143631"
+    },
+    "bookings.csv": {
+      "rows": 50000,
+      "sha256": "cc896c04ae431f133a2c5cd6ccbc3896452f041cb770314f1494962d2bb98895"
+    },
+    "booking_services.csv": {
+      "rows": 314185,
+      "sha256": "363374d817e72a77f21c605d302eaee3e32eec0fb5adc8771ec5b0a00110f5e3"
+    },
+    "_hidden/segments.csv": {
+      "rows": 50000,
+      "sha256": "f5b05130983cb6cf72dda8c041e1e2626b55e5b07495246f2639d817fcbbe3dd"
+    }
+  }
+}

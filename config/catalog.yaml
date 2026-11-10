@@ -1,0 +1,95 @@
+# Service catalog for the SYNTHETIC moving-booking dataset.
+#
+# Structure only: prices, probabilities and quantities live in assumptions.yaml.
+#
+# Fields
+#   id        unique service id (what the recommender ranks)
+#   category  display grouping, used for category-level metrics later
+#   unit      decision unit. Services that share a unit are size/type variants of one
+#             product family (e.g. three wardrobe-box sizes). The generator first decides
+#             "does this booking buy from the family?", then picks the variant(s).
+#   pricing   included        - truck cost is part of the hourly crew rate
+#             free            - free equipment, logged at $0
+#             unit            - unit_price x quantity
+#             labor_hours     - quantity is hours, billed at the booking's hourly rate
+#             specialty       - shares the flat specialty fee ($175 per 3 items)
+#             storage_monthly - quantity is months, monthly rate, first month free over 6 months
+#   origin    company_catalog - from the company's own item list (Nov 2026)
+#             company_kb      - named in the company knowledge base
+#             my_addition     - plausible extra, not confirmed by the company (easy to drop)
+
+crews: [crew_2, crew_3, crew_4]   # profile field, NOT a recommendation target
+
+services:
+  # Truck (pick exactly 1; labor-only bookings have none)
+  - {id: truck_10ft, category: truck, unit: truck, pricing: included, origin: company_catalog}
+  - {id: truck_16ft, category: truck, unit: truck, pricing: included, origin: company_catalog}
+  - {id: truck_26ft, category: truck, unit: truck, pricing: included, origin: company_catalog}
+
+  # Packing services
+  - {id: full_packing,   category: packing_service, unit: full_packing,   pricing: labor_hours, origin: company_kb}
+  - {id: unpacking,      category: packing_service, unit: unpacking,      pricing: labor_hours, origin: company_kb}
+  - {id: day_of_packing, category: packing_service, unit: day_of_packing, pricing: labor_hours, origin: company_kb}
+
+  # Boxes and wrap
+  - {id: small_box,   category: boxes_wrap, unit: small_box,   pricing: unit, origin: company_kb}
+  - {id: medium_box,  category: boxes_wrap, unit: medium_box,  pricing: unit, origin: company_kb}
+  - {id: large_box,   category: boxes_wrap, unit: large_box,   pricing: unit, origin: company_kb}
+  - {id: bubble_wrap, category: boxes_wrap, unit: bubble_wrap, pricing: unit, origin: company_kb}
+  - {id: dish_wrap,   category: boxes_wrap, unit: dish_wrap,   pricing: unit, origin: company_kb}
+
+  # Wardrobe boxes (sold to keep)
+  - {id: wardrobe_box_20in,       category: wardrobe_box, unit: wardrobe_box, pricing: unit, origin: company_catalog}
+  - {id: wardrobe_box_25in,       category: wardrobe_box, unit: wardrobe_box, pricing: unit, origin: company_catalog}
+  - {id: wardrobe_box_25in_short, category: wardrobe_box, unit: wardrobe_box, pricing: unit, origin: company_catalog}
+
+  # Speed packs
+  - {id: speed_pack_regular, category: speed_pack, unit: speed_pack, pricing: unit, origin: company_catalog}
+  - {id: speed_pack_large,   category: speed_pack, unit: speed_pack, pricing: unit, origin: company_catalog}
+
+  # Plastic / shrink wrap
+  - {id: plastic_wrap_13in, category: plastic_wrap, unit: plastic_wrap, pricing: unit, origin: company_catalog}
+  - {id: plastic_wrap_15in, category: plastic_wrap, unit: plastic_wrap, pricing: unit, origin: company_catalog}
+  - {id: plastic_wrap_17in, category: plastic_wrap, unit: plastic_wrap, pricing: unit, origin: company_catalog}
+
+  # Tape
+  - {id: tape_clear, category: tape, unit: tape, pricing: unit, origin: company_catalog}
+  - {id: tape_brown, category: tape, unit: tape, pricing: unit, origin: company_catalog}
+
+  # Surface protection
+  - {id: floor_protector_paper,  category: protection, unit: floor_protector,  pricing: unit, origin: company_catalog}
+  - {id: floor_protector_carpet, category: protection, unit: floor_protector,  pricing: unit, origin: company_catalog}
+  - {id: glass_protector,        category: protection, unit: glass_protector,  pricing: unit, origin: company_catalog}
+  - {id: tv_protector,           category: protection, unit: tv_protector,     pricing: unit, origin: company_catalog}
+  - {id: stairs_protector,       category: protection, unit: stairs_protector, pricing: unit, origin: company_catalog}
+
+  # Moving equipment (dollies are free per the KB but logged on the booking)
+  - {id: furniture_dolly,  category: equipment, unit: furniture_dolly,  pricing: free, origin: company_catalog}
+  - {id: hand_truck_dolly, category: equipment, unit: hand_truck_dolly, pricing: free, origin: company_catalog}
+  - {id: strap_elastic,    category: equipment, unit: straps, pricing: unit, origin: company_catalog}
+  - {id: strap_regular,    category: equipment, unit: straps, pricing: unit, origin: company_catalog}
+  - {id: strap_heavy_duty, category: equipment, unit: straps, pricing: unit, origin: company_catalog}
+
+  # Furniture
+  - {id: furniture_disassembly_reassembly, category: furniture, unit: furniture_disassembly_reassembly, pricing: labor_hours, origin: company_kb}
+
+  # Specialty / heavy items (share the flat specialty fee)
+  - {id: piano,            category: specialty, unit: piano,            pricing: specialty, origin: company_kb}
+  - {id: gun_safe,         category: specialty, unit: gun_safe,         pricing: specialty, origin: company_kb}
+  - {id: large_appliance,  category: specialty, unit: large_appliance,  pricing: specialty, origin: company_kb}
+  - {id: artwork,          category: specialty, unit: artwork,          pricing: specialty, origin: company_kb}
+  - {id: heavy_item_other, category: specialty, unit: heavy_item_other, pricing: specialty, origin: company_kb}
+
+  # Storage, climate-controlled (at most 1 unit per booking; quantity = months)
+  - {id: storage_5x5,   category: storage, unit: storage, pricing: storage_monthly, origin: company_catalog}
+  - {id: storage_5x10,  category: storage, unit: storage, pricing: storage_monthly, origin: company_catalog}
+  - {id: storage_10x10, category: storage, unit: storage, pricing: storage_monthly, origin: company_catalog}
+  - {id: storage_10x15, category: storage, unit: storage, pricing: storage_monthly, origin: company_catalog}
+  - {id: storage_10x20, category: storage, unit: storage, pricing: storage_monthly, origin: company_catalog}
+
+  # Container
+  - {id: u_box_5x7, category: container, unit: u_box_5x7, pricing: storage_monthly, origin: company_catalog}
+
+  # Other
+  - {id: mattress_bag,          category: other, unit: mattress_bag,          pricing: unit, origin: my_addition}
+  - {id: store_pickup_delivery, category: other, unit: store_pickup_delivery, pricing: unit, origin: my_addition}

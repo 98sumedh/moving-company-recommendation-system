@@ -1,0 +1,908 @@
+# Every number the SYNTHETIC data generator uses, with its source.
+#
+# Entry format
+#   value:        the number(s) the code reads
+#   description:  what it controls
+#   source:       where it comes from (URL for public sources)
+#   source_type:  company_kb        - company knowledge base / service catalog / staff, Nov 2026 (paraphrased)
+#                 public            - a public web page (url required)
+#                 public_derived    - computed or interpolated from a public number (url required)
+#                 generic_reasoning - no source; a stated, plausible guess
+#   confidence:   high | medium | low
+#   used_in:      module(s) that read it
+#
+# Rules: the generator reads numbers only from this file. Tests fail on a missing field,
+# a public entry without a url, or an entry the code never reads. Once tagged generator-v1,
+# changes need a new tag and a changelog note with a business reason.
+#
+# Note on sources: the Kaggle U-Haul rental-rates dataset could not be located (Nov 2026
+# search found only a morph.io scraper). U-Haul's own truck-size guide is cited instead.
+# Several public cost guides are content-marketing pages; their numbers are treated as
+# rough ranges (confidence medium/low), not facts.
+
+# ---------------------------------------------------------------- volume & calendar
+n_bookings:
+  value: 50000
+  description: Bookings over the 2-year window (about 68 per day)
+  source: "Company staff, Nov 2026: the company does about 70 jobs per day"
+  source_type: company_kb
+  confidence: high
+  used_in: [generate.py]
+
+date_range:
+  value: {start: "2024-10-01", months: 24}
+  description: Move-date window. Two full peak seasons; ends before the present.
+  source: "Chosen so a later season can be held out for testing"
+  source_type: generic_reasoning
+  confidence: high
+  used_in: [timeline.py]
+
+annual_growth:
+  value: 0.05
+  description: Year-over-year volume growth (linear over the window)
+  source: "Modest growth for an established regional mover"
+  source_type: generic_reasoning
+  confidence: low
+  used_in: [timeline.py]
+
+month_multiplier:
+  value: {1: 0.75, 2: 0.75, 3: 0.90, 4: 0.95, 5: 1.15, 6: 1.35, 7: 1.30, 8: 1.25, 9: 1.05, 10: 0.95, 11: 0.80, 12: 0.80}
+  description: Relative move volume by month. Gives ~42% of moves in May-Aug and ~51% in May-Sep.
+  source: "MoveBuddha: ~41% of US moves happen May-Aug; National Van Lines: roughly half happen May-Sep. Winter dip kept mild for San Diego weather."
+  url: "https://movebuddha.com/blog/peak-moving-season/ ; https://www.nationalvanlines.com/blog/why-moving-june-costs-22-more-how-time-right/"
+  source_type: public_derived
+  confidence: medium
+  used_in: [timeline.py]
+
+weekday_multiplier:
+  value: {Mon: 0.85, Tue: 0.85, Wed: 0.90, Thu: 0.95, Fri: 1.20, Sat: 1.35, Sun: 0.90}
+  description: Relative volume by day of week
+  source: "Fridays and Saturdays are popular because customers are off work; Sunday is lighter"
+  source_type: generic_reasoning
+  confidence: medium
+  used_in: [timeline.py]
+
+month_end_lift:
+  value: {last_days: 3, last_days_multiplier: 1.30, first_day_multiplier: 1.20}
+  description: Extra volume around month end and the 1st (leases turn over)
+  source: "MoveBuddha notes June 1 and June 30 as the busiest moving dates"
+  url: "https://movebuddha.com/blog/peak-moving-season/"
+  source_type: public_derived
+  confidence: medium
+  used_in: [timeline.py]
+
+holiday_multiplier:
+  value: {dates: ["01-01", "07-04", "12-25"], multiplier: 0.2}
+  description: Few moves on major holidays
+  source: "Crews and customers rarely move on these days"
+  source_type: generic_reasoning
+  confidence: medium
+  used_in: [timeline.py]
+
+# ---------------------------------------------------------------- move profile
+move_type_probs:
+  value: {local_residential: 0.62, long_distance: 0.10, commercial_office: 0.08, labor_only: 0.12, single_item: 0.08}
+  description: Share of bookings by move type. The type list comes from the KB; the shares are guesses.
+  source: "Types: company KB (residential/commercial, local/long-distance, labor-only, single items). Shares: local-heavy mover."
+  source_type: generic_reasoning
+  confidence: low
+  used_in: [profiles.py]
+
+home_size_probs:
+  value:
+    local_residential: {studio: 0.14, 1br: 0.26, 2br: 0.27, 3br: 0.20, 4br_plus: 0.13}
+    long_distance:     {studio: 0.10, 1br: 0.22, 2br: 0.28, 3br: 0.24, 4br_plus: 0.16}
+    labor_only:        {studio: 0.20, 1br: 0.30, 2br: 0.28, 3br: 0.15, 4br_plus: 0.07}
+    commercial_office: {office_s: 0.55, office_m: 0.33, office_l: 0.12}
+    single_item:       {single_item: 1.0}
+  description: Home or office size given move type
+  source: "Apartment-heavy coastal metro; labor-only customers skew smaller"
+  source_type: generic_reasoning
+  confidence: low
+  used_in: [profiles.py]
+
+sq_ft_median:
+  value: {single_item: 0, studio: 500, 1br: 750, 2br: 1050, 3br: 1600, 4br_plus: 2400, office_s: 1200, office_m: 3000, office_l: 7000}
+  description: Median square feet by size (lognormal around it; 0 = not applicable)
+  source: "Typical US unit sizes"
+  source_type: generic_reasoning
+  confidence: medium
+  used_in: [profiles.py]
+
+sq_ft_sigma:
+  value: 0.22
+  description: Lognormal spread of square feet
+  source: "Spread so the largest 4-bedrooms pass the 2,000 sq ft walkthrough threshold"
+  source_type: generic_reasoning
+  confidence: low
+  used_in: [profiles.py]
+
+weight_median_lbs:
+  value: {single_item: 250, studio: 1800, 1br: 2800, 2br: 4800, 3br: 7100, 4br_plus: 10000, office_s: 3500, office_m: 8000, office_l: 15000}
+  description: Median shipment weight by size (lognormal around it)
+  source: "National Van Lines: 1BR 2,000-3,000 lb, 2BR 4,000-6,000 lb; SafeBound citing AMSA: 3BR ~7,100 lb; Movers.com: ~1,000 lb per room. Offices are guesses."
+  url: "https://www.nationalvanlines.com/blog/how-do-long-distance-movers-calculate-weight-and-why-does-it-matter-for-your-budget/ ; https://www.safeboundmoving.com/blog/moving-costs-by-household-size-in-2026 ; https://www.movers.com/ask-moving-expert/what-is-the-average-weight-of-a-four-4-bedroom-house-23395"
+  source_type: public
+  confidence: medium
+  used_in: [profiles.py]
+
+weight_sigma:
+  value: 0.25
+  description: Lognormal spread of weight
+  source: "Public guides give ranges about +/-25% around the midpoint"
+  source_type: generic_reasoning
+  confidence: medium
+  used_in: [profiles.py]
+
+crew_by_home_size:
+  value: {single_item: crew_2, studio: crew_2, 1br: crew_2, 2br: crew_3, 3br: crew_3, 4br_plus: crew_4, office_s: crew_3, office_m: crew_4, office_l: crew_4}
+  description: Typical crew by size. Residential from the KB price table; offices are guesses.
+  source: "Company KB, section 8 (typical crew by home size)"
+  source_type: company_kb
+  confidence: high
+  used_in: [profiles.py]
+
+crew_noise_prob:
+  value: 0.12
+  description: Chance the office picks one crew size up or down from the typical one
+  source: "KB: the office confirms the right crew for each job, so it varies"
+  source_type: generic_reasoning
+  confidence: low
+  used_in: [profiles.py]
+
+truck_probs:
+  value:
+    single_item: {truck_10ft: 0.90, truck_16ft: 0.10}
+    studio:      {truck_10ft: 0.70, truck_16ft: 0.30}
+    1br:         {truck_10ft: 0.35, truck_16ft: 0.60, truck_26ft: 0.05}
+    2br:         {truck_16ft: 0.75, truck_26ft: 0.25}
+    3br:         {truck_16ft: 0.30, truck_26ft: 0.70}
+    4br_plus:    {truck_16ft: 0.05, truck_26ft: 0.95}
+    office_s:    {truck_16ft: 0.70, truck_26ft: 0.30}
+    office_m:    {truck_16ft: 0.10, truck_26ft: 0.90}
+    office_l:    {truck_26ft: 1.00}
+  description: Truck size given home size (company fleet is 10/16/26 ft; labor-only has none)
+  source: "U-Haul guide: 10 ft ~ 1 bedroom, 15 ft ~ 2, 20 ft ~ 2-3, 26 ft ~ 3-4. KB: 16 ft for studio/1BR, 26 ft for 4+. Mapped onto the company's 10/16/26 ft fleet."
+  url: "https://www.uhaul.com/Tips/Loading/How-To-Choose-The-Right-Size-Moving-Truck-Rental-15591"
+  source_type: public_derived
+  confidence: medium
+  used_in: [profiles.py]
+
+# ---------------------------------------------------------------- geography
+service_area:
+  value: {local: [san_diego_county, orange_county], long_distance_max_miles: 500, long_distance_states: [CA, NV, AZ]}
+  description: Where the company works
+  source: "Company KB, section 1 (service area)"
+  source_type: company_kb
+  confidence: high
+  used_in: [profiles.py]
+
+local_regions:
+  value:
+    sd_central:       {county: san_diego_county, weight: 0.22}
+    sd_north_coastal: {county: san_diego_county, weight: 0.14}
+    sd_north_inland:  {county: san_diego_county, weight: 0.14}
+    sd_east:          {county: san_diego_county, weight: 0.12}
+    sd_south:         {county: san_diego_county, weight: 0.12}
+    oc_north:         {county: orange_county, weight: 0.12}
+    oc_south:         {county: orange_county, weight: 0.14}
+  description: Local regions and their share of moves
+  source: "San Diego-based company; most jobs in SD County"
+  source_type: generic_reasoning
+  confidence: low
+  used_in: [profiles.py]
+
+local_same_region_prob:
+  value: 0.55
+  description: Chance a local move stays in the same region
+  source: "Most local moves are short"
+  source_type: generic_reasoning
+  confidence: low
+  used_in: [profiles.py]
+
+local_drive_minutes:
+  value: {same_region: 15, same_county: 30, cross_county: 70, sigma: 0.35, miles_per_minute: 0.6}
+  description: Median drive time between pickup and drop-off, and miles per minute of driving
+  source: "Rough SD/OC freeway driving times"
+  source_type: generic_reasoning
+  confidence: low
+  used_in: [profiles.py]
+
+long_distance_destinations:
+  value:
+    los_angeles:    {miles: 120, state: CA, weight: 0.24}
+    inland_empire:  {miles: 95,  state: CA, weight: 0.14}
+    bakersfield:    {miles: 230, state: CA, weight: 0.06}
+    fresno:         {miles: 340, state: CA, weight: 0.06}
+    bay_area:       {miles: 460, state: CA, weight: 0.12}
+    sacramento:     {miles: 495, state: CA, weight: 0.06}
+    las_vegas:      {miles: 330, state: NV, weight: 0.13}
+    phoenix:        {miles: 355, state: AZ, weight: 0.13}
+    tucson:         {miles: 410, state: AZ, weight: 0.06}
+  description: Long-distance endpoints (approximate road miles from San Diego) and their share
+  source: "Approximate road distances from public maps; shares are guesses"
+  source_type: generic_reasoning
+  confidence: medium
+  used_in: [profiles.py]
+
+long_distance_miles_sigma:
+  value: 0.05
+  description: Lognormal spread of exact long-distance miles around the city distance (capped at the service-area limit)
+  source: "Addresses vary within a metro area"
+  source_type: generic_reasoning
+  confidence: medium
+  used_in: [profiles.py]
+
+long_distance_outbound_prob:
+  value: 0.55
+  description: Share of long-distance moves leaving the local area (rest arrive into it)
+  source: "Roughly balanced flows"
+  source_type: generic_reasoning
+  confidence: low
+  used_in: [profiles.py]
+
+long_distance_mph:
+  value: 50
+  description: Average truck speed for drive time on long moves
+  source: "Loaded truck on freeways with stops"
+  source_type: generic_reasoning
+  confidence: medium
+  used_in: [profiles.py]
+
+season_months:
+  value: {summer: [6, 7, 8], rainy_season: [11, 12, 1, 2, 3]}
+  description: Months that count as summer and as the rainy season (used by add-on rules)
+  source: "San Diego gets most of its rain November-March"
+  source_type: generic_reasoning
+  confidence: medium
+  used_in: [profiles.py]
+
+# ---------------------------------------------------------------- access
+apartment_prob:
+  value: {single_item: 0.40, studio: 0.90, 1br: 0.80, 2br: 0.55, 3br: 0.25, 4br_plus: 0.10, office_s: 0.60, office_m: 0.60, office_l: 0.60}
+  description: Chance an address is in a multi-floor building (apartment or office building)
+  source: "Smaller homes are mostly apartments"
+  source_type: generic_reasoning
+  confidence: low
+  used_in: [profiles.py]
+
+apartment_floor_probs:
+  value: {1: 0.35, 2: 0.30, 3: 0.20, 4: 0.10, 5: 0.05}
+  description: Floor of an apartment or office address
+  source: "San Diego housing is mostly low-rise"
+  source_type: generic_reasoning
+  confidence: low
+  used_in: [profiles.py]
+
+elevator_prob_by_floor:
+  value: {1: 0.10, 2: 0.25, 3: 0.60, 4: 0.85, 5: 0.95}
+  description: Chance the building has a usable elevator, by floor
+  source: "Higher floors more likely to have an elevator"
+  source_type: generic_reasoning
+  confidence: low
+  used_in: [profiles.py]
+
+two_story_house_prob:
+  value: {single_item: 0.05, studio: 0.05, 1br: 0.05, 2br: 0.20, 3br: 0.45, 4br_plus: 0.60, office_s: 0.0, office_m: 0.0, office_l: 0.0}
+  description: Chance a house has an internal staircase (counts as 1 flight)
+  source: "Larger houses are more often two-story"
+  source_type: generic_reasoning
+  confidence: low
+  used_in: [profiles.py]
+
+# ---------------------------------------------------------------- customer & quote
+payment_method_probs:
+  value:
+    default:       {cash: 0.25, venmo: 0.20, card: 0.55}
+    long_distance: {cash: 0.10, venmo: 0.10, card: 0.80}
+  description: Payment method. The method list comes from the KB; the shares are guesses.
+  source: "KB section 6 lists cash/check, Venmo, card"
+  source_type: generic_reasoning
+  confidence: low
+  used_in: [profiles.py]
+
+walkthrough_sq_ft:
+  value: 2000
+  description: Homes over this size get a free in-person walkthrough
+  source: "Company KB, section 5 (estimates)"
+  source_type: company_kb
+  confidence: high
+  used_in: [profiles.py]
+
+walkthrough_extra_prob:
+  value: 0.08
+  description: Chance a smaller job still gets an in-person walkthrough
+  source: "Some customers ask for one anyway"
+  source_type: generic_reasoning
+  confidence: low
+  used_in: [profiles.py]
+
+# ---------------------------------------------------------------- timing
+lead_time_median_days:
+  value: {local_residential: 14, long_distance: 24, commercial_office: 21, labor_only: 7, single_item: 4}
+  description: Median days between booking and move (lognormal)
+  source: "KB: book 2-3 weeks ahead if possible; same/next-day sometimes available. Per-type values are guesses around that."
+  source_type: company_kb
+  confidence: medium
+  used_in: [timeline.py]
+
+lead_time_sigma:
+  value: 0.75
+  description: Lognormal spread of lead time
+  source: "Wide spread: some book months ahead, some days ahead"
+  source_type: generic_reasoning
+  confidence: low
+  used_in: [timeline.py]
+
+lead_time_max_days:
+  value: 120
+  description: Longest lead time
+  source: "Bookings rarely open more than ~4 months out"
+  source_type: generic_reasoning
+  confidence: low
+  used_in: [timeline.py]
+
+same_next_day_share:
+  value: 0.06
+  description: Share of non-long-distance bookings made for the same or next day
+  source: "KB says same/next-day may be available; share is a guess"
+  source_type: generic_reasoning
+  confidence: low
+  used_in: [timeline.py]
+
+segment_lead_time_multiplier:
+  value: {military_pcs: 1.3, senior_downsizer: 1.4, student: 0.7, collector_premium: 1.2}
+  description: Lead time multipliers for some hidden segments (others 1.0)
+  source: "Military orders and downsizing are planned early; students book late"
+  source_type: generic_reasoning
+  confidence: low
+  used_in: [timeline.py]
+
+office_hours:
+  value: {weekday: [7, 19], weekend: [7, 17]}
+  description: Hours when bookings are confirmed (booking timestamps fall inside them)
+  source: "Company KB, section 1 (office hours)"
+  source_type: company_kb
+  confidence: high
+  used_in: [timeline.py]
+
+arrival_window_start_hour:
+  value: {morning: 8, afternoon: 13}
+  description: Start of the crew arrival window
+  source: "Company KB, section 10 (8-9 AM and 1-3 PM windows)"
+  source_type: company_kb
+  confidence: high
+  used_in: [timeline.py]
+
+afternoon_share:
+  value: 0.30
+  description: Share of jobs in the afternoon window
+  source: "Most moves start in the morning"
+  source_type: generic_reasoning
+  confidence: low
+  used_in: [timeline.py]
+
+# ---------------------------------------------------------------- status & customers
+status_probs:
+  value: {completed: 0.91, rescheduled: 0.04, cancelled: 0.05}
+  description: Final booking status (rescheduled = moved to another date with no fee; move_date is the final date)
+  source: "KB allows free rescheduling and cancellation; shares are guesses"
+  source_type: generic_reasoning
+  confidence: low
+  used_in: [generate.py]
+
+late_cancel_share:
+  value: 0.40
+  description: Share of cancellations made within 48 hours (deposit forfeited)
+  source: "KB: cancelling within 48 hours forfeits the deposit; share is a guess"
+  source_type: generic_reasoning
+  confidence: low
+  used_in: [generate.py]
+
+deposit:
+  value: 60
+  description: Deposit to reserve a move (counts toward the total)
+  source: "Company KB, section 5 (booking)"
+  source_type: company_kb
+  confidence: high
+  used_in: [generate.py]
+
+repeat_prob:
+  value: {residential: 0.03, commercial: 0.40}
+  description: Chance a booking belongs to an existing customer. Most customers book once.
+  source: "Residential moves are rare events; office accounts come back"
+  source_type: generic_reasoning
+  confidence: low
+  used_in: [generate.py]
+
+repeat_storage_pool_prob:
+  value: 0.5
+  description: When a booking is a repeat, chance it comes from a customer who had storage (moving out of storage)
+  source: "Storage customers come back to move their things out"
+  source_type: generic_reasoning
+  confidence: low
+  used_in: [generate.py]
+
+repeat_min_gap_days:
+  value: 30
+  description: Minimum days between a customer's moves
+  source: "Back-to-back moves within a month are rare"
+  source_type: generic_reasoning
+  confidence: low
+  used_in: [generate.py]
+
+# ---------------------------------------------------------------- hidden segments
+segment_base_logit:
+  value: {budget_diy: 0.3, full_service_family: 0.2, military_pcs: -0.6, student: -0.5, senior_downsizer: -0.6, collector_premium: -2.6}
+  description: Base log-odds of each non-commercial hidden segment (softmax). Never exported to modeling files.
+  source: "San Diego has large Navy/USMC and university populations; collectors are rare"
+  source_type: generic_reasoning
+  confidence: low
+  used_in: [segments.py]
+
+commercial_segment_probs:
+  value: {commercial_office: 0.85, budget_diy: 0.10, collector_premium: 0.05}
+  description: Hidden segment for commercial/office bookings
+  source: "Most office moves behave alike; some are lean, some have art/equipment"
+  source_type: generic_reasoning
+  confidence: low
+  used_in: [segments.py]
+
+segment_profile_effects:
+  value:
+    - {feature: labor_only,     segment: budget_diy,          delta: 1.8}
+    - {feature: labor_only,     segment: full_service_family, delta: -1.5}
+    - {feature: single_item,    segment: student,             delta: 0.8}
+    - {feature: single_item,    segment: budget_diy,          delta: 0.5}
+    - {feature: long_distance,  segment: military_pcs,        delta: 1.2}
+    - {feature: long_distance,  segment: full_service_family, delta: 0.3}
+    - {feature: small_home,     segment: student,             delta: 1.0}
+    - {feature: large_home,     segment: full_service_family, delta: 0.8}
+    - {feature: large_home,     segment: collector_premium,   delta: 0.7}
+    - {feature: large_home,     segment: student,             delta: -2.0}
+    - {feature: big_sq_ft,      segment: collector_premium,   delta: 0.5}
+  description: Soft links from observable profile to hidden segment (so the profile only partly reveals it)
+  source: "Plausible tendencies"
+  source_type: generic_reasoning
+  confidence: low
+  used_in: [segments.py]
+
+segment_month_effects:
+  value:
+    military_pcs:        {5: 0.6, 6: 0.9, 7: 0.9, 8: 0.7, 12: -0.5, 1: -0.5, 2: -0.5}
+    student:             {5: 0.4, 6: 1.2, 8: 0.6, 9: 1.0, 1: -0.3, 2: -0.3, 3: -0.3, 4: -0.3, 10: -0.3, 11: -0.3, 12: -0.3}
+    senior_downsizer:    {10: 0.5, 11: 0.5, 12: 0.5, 1: 0.5, 2: 0.5, 3: 0.5, 6: -0.4, 7: -0.4, 8: -0.4}
+    full_service_family: {6: 0.4, 7: 0.4, 8: 0.4}
+  description: Seasonal shift in the hidden segment mix (creates real train/test drift)
+  source: "Military PCS moves peak in summer; students move at term ends (June) and starts (Sept); families move in school breaks"
+  source_type: generic_reasoning
+  confidence: medium
+  used_in: [segments.py]
+
+# ---------------------------------------------------------------- add-on sampling
+unit_base_logit:
+  value:
+    full_packing: -2.7
+    unpacking: -3.5
+    day_of_packing: -2.3
+    small_box: -1.1
+    medium_box: -1.3
+    large_box: -1.7
+    bubble_wrap: -1.8
+    dish_wrap: -1.9
+    wardrobe_box: -1.5
+    speed_pack: -2.3
+    plastic_wrap: -1.1
+    tape: -0.8
+    floor_protector: -2.1
+    glass_protector: -2.7
+    tv_protector: -1.7
+    stairs_protector: -3.1
+    furniture_dolly: -2.7
+    hand_truck_dolly: -2.3
+    straps: -2.5
+    furniture_disassembly_reassembly: -1.4
+    piano: -4.0
+    gun_safe: -3.6
+    large_appliance: -2.6
+    artwork: -3.8
+    heavy_item_other: -3.0
+    storage: -2.6
+    u_box_5x7: -4.5
+    mattress_bag: -2.1
+    store_pickup_delivery: -4.0
+  description: Base log-odds that a booking buys from each product family (before profile/segment effects)
+  source: "Calibrated once, before any model existed, so a local residential cart has a median of ~5 add-on lines (specialty and storage left rare)"
+  source_type: generic_reasoning
+  confidence: low
+  used_in: [services.py]
+
+profile_effects:
+  value:
+    # labor-only: customer has their own truck/container
+    - {feature: labor_only, unit: full_packing, delta: -5.0}
+    - {feature: labor_only, unit: unpacking, delta: -5.0}
+    - {feature: labor_only, unit: day_of_packing, delta: -4.0}
+    - {feature: labor_only, unit: store_pickup_delivery, delta: -5.0}
+    - {feature: labor_only, unit: storage, delta: -1.0}
+    - {feature: labor_only, unit: u_box_5x7, delta: 3.2}
+    - {feature: labor_only, unit: furniture_dolly, delta: 1.8}
+    - {feature: labor_only, unit: hand_truck_dolly, delta: 1.8}
+    - {feature: labor_only, unit: straps, delta: 1.5}
+    - {feature: labor_only, unit: plastic_wrap, delta: 0.4}
+    - {feature: labor_only, unit: small_box, delta: -0.8}
+    - {feature: labor_only, unit: medium_box, delta: -0.8}
+    - {feature: labor_only, unit: large_box, delta: -0.8}
+    - {feature: labor_only, unit: tv_protector, delta: -0.6}
+    # single item / store delivery
+    - {feature: single_item, unit: small_box, delta: -4.0}
+    - {feature: single_item, unit: medium_box, delta: -4.0}
+    - {feature: single_item, unit: large_box, delta: -4.0}
+    - {feature: single_item, unit: bubble_wrap, delta: -2.0}
+    - {feature: single_item, unit: dish_wrap, delta: -5.0}
+    - {feature: single_item, unit: wardrobe_box, delta: -5.0}
+    - {feature: single_item, unit: speed_pack, delta: -5.0}
+    - {feature: single_item, unit: tape, delta: -1.5}
+    - {feature: single_item, unit: full_packing, delta: -6.0}
+    - {feature: single_item, unit: unpacking, delta: -6.0}
+    - {feature: single_item, unit: day_of_packing, delta: -4.0}
+    - {feature: single_item, unit: floor_protector, delta: -1.0}
+    - {feature: single_item, unit: stairs_protector, delta: -1.0}
+    - {feature: single_item, unit: storage, delta: -1.5}
+    - {feature: single_item, unit: u_box_5x7, delta: -5.0}
+    - {feature: single_item, unit: mattress_bag, delta: 0.3}
+    - {feature: single_item, unit: plastic_wrap, delta: 0.5}
+    - {feature: single_item, unit: store_pickup_delivery, delta: 2.2}
+    - {feature: single_item, unit: furniture_disassembly_reassembly, delta: 0.3}
+    # long distance
+    - {feature: long_distance, unit: storage, delta: 1.6}
+    - {feature: long_distance, unit: plastic_wrap, delta: 1.2}
+    - {feature: long_distance, unit: straps, delta: 1.4}
+    - {feature: long_distance, unit: full_packing, delta: 1.2}
+    - {feature: long_distance, unit: bubble_wrap, delta: 0.8}
+    - {feature: long_distance, unit: dish_wrap, delta: 0.6}
+    - {feature: long_distance, unit: tv_protector, delta: 0.8}
+    - {feature: long_distance, unit: glass_protector, delta: 0.6}
+    - {feature: long_distance, unit: u_box_5x7, delta: 0.5}
+    - {feature: long_distance, unit: furniture_disassembly_reassembly, delta: 0.6}
+    - {feature: long_distance, unit: mattress_bag, delta: 0.6}
+    # commercial / office
+    - {feature: commercial, unit: wardrobe_box, delta: -3.0}
+    - {feature: commercial, unit: dish_wrap, delta: -2.5}
+    - {feature: commercial, unit: mattress_bag, delta: -4.0}
+    - {feature: commercial, unit: piano, delta: -2.0}
+    - {feature: commercial, unit: store_pickup_delivery, delta: -2.0}
+    - {feature: commercial, unit: tape, delta: 0.8}
+    - {feature: commercial, unit: medium_box, delta: 0.8}
+    - {feature: commercial, unit: large_box, delta: 0.4}
+    - {feature: commercial, unit: furniture_disassembly_reassembly, delta: 1.2}
+    - {feature: commercial, unit: floor_protector, delta: 0.8}
+    - {feature: commercial, unit: glass_protector, delta: 0.6}
+    - {feature: commercial, unit: hand_truck_dolly, delta: 1.0}
+    - {feature: commercial, unit: tv_protector, delta: 0.8}
+    # home size
+    - {feature: small_home, unit: full_packing, delta: -0.5}
+    - {feature: small_home, unit: wardrobe_box, delta: -0.4}
+    - {feature: small_home, unit: piano, delta: -1.0}
+    - {feature: small_home, unit: gun_safe, delta: -1.0}
+    - {feature: small_home, unit: large_appliance, delta: -0.6}
+    - {feature: small_home, unit: storage, delta: -0.3}
+    - {feature: large_home, unit: full_packing, delta: 0.7}
+    - {feature: large_home, unit: unpacking, delta: 0.5}
+    - {feature: large_home, unit: piano, delta: 1.0}
+    - {feature: large_home, unit: gun_safe, delta: 1.0}
+    - {feature: large_home, unit: large_appliance, delta: 0.8}
+    - {feature: large_home, unit: artwork, delta: 0.5}
+    - {feature: large_home, unit: wardrobe_box, delta: 0.6}
+    - {feature: large_home, unit: glass_protector, delta: 0.5}
+    - {feature: large_home, unit: storage, delta: 0.3}
+    - {feature: big_sq_ft, unit: full_packing, delta: 0.6}
+    - {feature: big_sq_ft, unit: artwork, delta: 0.6}
+    - {feature: in_person_estimate, unit: full_packing, delta: 0.4}
+    # access
+    - {feature: has_stairs, unit: stairs_protector, delta: 2.2}
+    - {feature: has_stairs, unit: day_of_packing, delta: 0.4}
+    - {feature: has_stairs, unit: furniture_disassembly_reassembly, delta: 0.6}
+    - {feature: has_stairs, unit: floor_protector, delta: 0.3}
+    - {feature: has_elevator, unit: floor_protector, delta: 0.8}
+    # season / calendar
+    - {feature: summer, unit: storage, delta: 0.3}
+    - {feature: rainy_season, unit: floor_protector, delta: 0.7}
+    - {feature: rainy_season, unit: plastic_wrap, delta: 0.3}
+    - {feature: weekend, unit: full_packing, delta: -0.2}
+  description: Additive log-odds effects of observable profile features on each product family
+  source: "Plausible business logic (stairs need stair protection, long moves need wrap and storage, etc.)"
+  source_type: generic_reasoning
+  confidence: low
+  used_in: [services.py]
+
+segment_effects:
+  value:
+    budget_diy:          {full_packing: -1.5, unpacking: -1.2, day_of_packing: 0.3, small_box: 0.6, medium_box: 0.5, tape: 0.7, plastic_wrap: 0.3, hand_truck_dolly: 0.6, furniture_dolly: 0.6, straps: 0.4, u_box_5x7: 0.8, storage: -0.3}
+    full_service_family: {full_packing: 1.6, unpacking: 1.4, dish_wrap: 0.6, wardrobe_box: 0.8, mattress_bag: 0.7, furniture_disassembly_reassembly: 0.6, tv_protector: 0.5, speed_pack: 0.6, day_of_packing: -0.8}
+    military_pcs:        {storage: 1.4, full_packing: 0.9, unpacking: 0.6, plastic_wrap: 0.5, gun_safe: 1.4, wardrobe_box: 0.5, tv_protector: 0.6}
+    student:             {small_box: 0.6, medium_box: 0.2, large_box: -0.4, tape: 0.6, store_pickup_delivery: 1.6, mattress_bag: 0.9, full_packing: -1.2, storage: 0.5, speed_pack: 0.5, furniture_disassembly_reassembly: -0.5}
+    senior_downsizer:    {unpacking: 1.4, full_packing: 0.8, storage: 1.4, dish_wrap: 0.9, bubble_wrap: 0.7, furniture_disassembly_reassembly: 0.4, glass_protector: 0.5, artwork: 0.6}
+    commercial_office:   {tape: 0.6, medium_box: 0.6, furniture_disassembly_reassembly: 0.8, hand_truck_dolly: 0.8, floor_protector: 0.6, storage: 0.3}
+    collector_premium:   {artwork: 3.0, piano: 2.0, glass_protector: 2.0, bubble_wrap: 1.4, full_packing: 1.5, tv_protector: 0.8, heavy_item_other: 1.0, floor_protector: 0.8}
+  description: Additive log-odds effects of the HIDDEN segment on each product family
+  source: "Plausible segment tastes; the model never sees the segment"
+  source_type: generic_reasoning
+  confidence: low
+  used_in: [services.py]
+
+cooccurrence_lifts:
+  value:
+    - {if: full_packing, then: unpacking, lift: 1.5}
+    - {if: full_packing, then: dish_wrap, lift: 1.0}
+    - {if: full_packing, then: wardrobe_box, lift: 0.8}
+    - {if: full_packing, then: bubble_wrap, lift: 0.7}
+    - {if: full_packing, then: mattress_bag, lift: 0.5}
+    - {if: floor_protector, then: stairs_protector, lift: 1.2}
+    - {if: piano, then: heavy_item_other, lift: 1.0}
+    - {if: piano, then: floor_protector, lift: 0.8}
+    - {if: storage, then: plastic_wrap, lift: 0.8}
+    - {if: storage, then: mattress_bag, lift: 0.6}
+    - {if: large_box, then: medium_box, lift: 1.0}
+    - {if: small_box, then: tape, lift: 1.2}
+    - {if: medium_box, then: tape, lift: 1.0}
+    - {if: tv_protector, then: glass_protector, lift: 0.6}
+    - {if: u_box_5x7, then: straps, lift: 1.0}
+    - {if: furniture_disassembly_reassembly, then: plastic_wrap, lift: 0.4}
+  description: "If family A is in the cart, raise the log-odds of family B by lift (applied in order, as a conditional second draw)"
+  source: "Items that go together in practice"
+  source_type: generic_reasoning
+  confidence: low
+  used_in: [services.py]
+
+exclusive_units:
+  value: [[full_packing, day_of_packing]]
+  description: Families that can't both be in a cart (the first one wins)
+  source: "Day-of packing only exists when the customer did not book full packing (KB section 10)"
+  source_type: company_kb
+  confidence: high
+  used_in: [services.py]
+
+booking_noise_sd:
+  value: 0.5
+  description: Per-booking shared log-odds noise (some customers just buy more)
+  source: "Unobserved spending propensity"
+  source_type: generic_reasoning
+  confidence: low
+  used_in: [services.py]
+
+item_noise_sd:
+  value: 0.6
+  description: Per-booking, per-family log-odds noise
+  source: "Idiosyncratic choices"
+  source_type: generic_reasoning
+  confidence: low
+  used_in: [services.py]
+
+random_add_prob:
+  value: 0.04
+  description: Chance a booking gets one extra random family (creates rare/odd combinations)
+  source: "Upsells, data-entry quirks, odd requests"
+  source_type: generic_reasoning
+  confidence: low
+  used_in: [services.py]
+
+random_drop_prob:
+  value: 0.03
+  description: Chance each chosen item is dropped (cancelled line, forgotten)
+  source: "Line items removed before the move"
+  source_type: generic_reasoning
+  confidence: low
+  used_in: [services.py]
+
+size_class:
+  value: {single_item: small, studio: small, 1br: small, 2br: medium, office_s: medium, 3br: large, 4br_plus: large, office_m: large, office_l: large}
+  description: Groups home sizes into small/medium/large for variant choice and quantities
+  source: "Convenience grouping"
+  source_type: generic_reasoning
+  confidence: high
+  used_in: [services.py]
+
+variant_weights:
+  value:
+    wardrobe_box:    {small: {wardrobe_box_20in: 0.6, wardrobe_box_25in: 0.2, wardrobe_box_25in_short: 0.2}, medium: {wardrobe_box_20in: 0.5, wardrobe_box_25in: 0.3, wardrobe_box_25in_short: 0.2}, large: {wardrobe_box_20in: 0.4, wardrobe_box_25in: 0.4, wardrobe_box_25in_short: 0.2}}
+    speed_pack:      {small: {speed_pack_regular: 0.8, speed_pack_large: 0.2}, medium: {speed_pack_regular: 0.6, speed_pack_large: 0.4}, large: {speed_pack_regular: 0.4, speed_pack_large: 0.6}}
+    plastic_wrap:    {small: {plastic_wrap_13in: 0.5, plastic_wrap_15in: 0.35, plastic_wrap_17in: 0.15}, medium: {plastic_wrap_13in: 0.3, plastic_wrap_15in: 0.4, plastic_wrap_17in: 0.3}, large: {plastic_wrap_13in: 0.15, plastic_wrap_15in: 0.35, plastic_wrap_17in: 0.5}}
+    tape:            {small: {tape_clear: 0.45, tape_brown: 0.55}, medium: {tape_clear: 0.45, tape_brown: 0.55}, large: {tape_clear: 0.45, tape_brown: 0.55}}
+    floor_protector: {small: {floor_protector_paper: 0.6, floor_protector_carpet: 0.4}, medium: {floor_protector_paper: 0.55, floor_protector_carpet: 0.45}, large: {floor_protector_paper: 0.5, floor_protector_carpet: 0.5}}
+    straps:          {small: {strap_elastic: 0.5, strap_regular: 0.35, strap_heavy_duty: 0.15}, medium: {strap_elastic: 0.35, strap_regular: 0.4, strap_heavy_duty: 0.25}, large: {strap_elastic: 0.2, strap_regular: 0.4, strap_heavy_duty: 0.4}}
+    storage:         {small: {storage_5x5: 0.40, storage_5x10: 0.45, storage_10x10: 0.15}, medium: {storage_5x10: 0.15, storage_10x10: 0.55, storage_10x15: 0.30}, large: {storage_10x10: 0.15, storage_10x15: 0.40, storage_10x20: 0.45}}
+  description: Which size/type variant a booking picks within a family, by size class
+  source: "Bigger homes pick bigger units and wider wrap"
+  source_type: generic_reasoning
+  confidence: low
+  used_in: [services.py]
+
+extra_variant_prob:
+  value: {wardrobe_box: 0.25, speed_pack: 0.10, plastic_wrap: 0.15, tape: 0.20, floor_protector: 0.15, straps: 0.25, storage: 0.0}
+  description: Chance a booking buys a second variant of the same family (storage is never 2 units)
+  source: "Customers sometimes mix sizes"
+  source_type: generic_reasoning
+  confidence: low
+  used_in: [services.py]
+
+quantity_rules:
+  value:
+    small_box:   {median: {small: 10, medium: 20, large: 32}, sd: 0.4, min: 1, step: 1}
+    medium_box:  {median: {small: 8, medium: 16, large: 26}, sd: 0.4, min: 1, step: 1}
+    large_box:   {median: {small: 5, medium: 10, large: 16}, sd: 0.4, min: 1, step: 1}
+    bubble_wrap: {median: {small: 1, medium: 2, large: 3}, sd: 0.3, min: 1, step: 1}
+    dish_wrap:   {median: {small: 1, medium: 2, large: 3}, sd: 0.3, min: 1, step: 1}
+    wardrobe_box: {median: {small: 2, medium: 4, large: 6}, sd: 0.35, min: 1, step: 1}
+    speed_pack:  {median: {small: 1, medium: 1, large: 2}, sd: 0.3, min: 1, step: 1}
+    plastic_wrap: {median: {small: 1, medium: 2, large: 3}, sd: 0.3, min: 1, step: 1}
+    tape:        {median: {small: 2, medium: 4, large: 6}, sd: 0.35, min: 1, step: 1}
+    floor_protector: {median: {small: 1, medium: 2, large: 3}, sd: 0.3, min: 1, step: 1}
+    glass_protector: {median: {small: 1, medium: 2, large: 3}, sd: 0.3, min: 1, step: 1}
+    tv_protector: {median: {small: 1, medium: 1, large: 2}, sd: 0.3, min: 1, step: 1}
+    stairs_protector: {median: {small: 1, medium: 1, large: 2}, sd: 0.3, min: 1, step: 1}
+    furniture_dolly: {median: 1, sd: 0.0, min: 1, step: 1}
+    hand_truck_dolly: {median: 1, sd: 0.0, min: 1, step: 1}
+    straps:      {median: {small: 2, medium: 4, large: 6}, sd: 0.35, min: 1, step: 1}
+    furniture_disassembly_reassembly: {median: {small: 0.75, medium: 1.25, large: 2.0}, sd: 0.35, min: 0.5, step: 0.25}
+    full_packing: {median: {small: 3, medium: 5, large: 8}, sd: 0.25, min: 1, step: 0.5}
+    unpacking:   {median: {small: 2, medium: 3.5, large: 5}, sd: 0.25, min: 1, step: 0.5}
+    day_of_packing: {median: {small: 1, medium: 1.5, large: 2}, sd: 0.35, min: 0.5, step: 0.5}
+    piano:       {median: 1, sd: 0.0, min: 1, step: 1}
+    gun_safe:    {median: 1, sd: 0.2, min: 1, step: 1}
+    large_appliance: {median: {small: 1, medium: 1, large: 2}, sd: 0.3, min: 1, step: 1}
+    artwork:     {median: {small: 2, medium: 3, large: 4}, sd: 0.4, min: 1, step: 1}
+    heavy_item_other: {median: {small: 1, medium: 1, large: 2}, sd: 0.3, min: 1, step: 1}
+    mattress_bag: {median: {small: 1, medium: 2, large: 3}, sd: 0.25, min: 1, step: 1}
+    store_pickup_delivery: {median: 1, sd: 0.0, min: 1, step: 1}
+  description: "Quantity per chosen item: median (by size class) x lognormal(sd), rounded to step, at least min. Labor items are hours."
+  source: "Scaled to home size; box counts follow common 'boxes per room' rules of thumb"
+  source_type: generic_reasoning
+  confidence: low
+  used_in: [services.py]
+
+storage_months:
+  value:
+    short_median: 2
+    long_median: 9
+    sd: 0.4
+    long_term_prob: {default: 0.25, senior_downsizer: 0.70, military_pcs: 0.20, student: 0.30, collector_premium: 0.40}
+  description: Months of storage (or U-Box) rental; short-term vs long-term split by hidden segment
+  source: "Students store over summer, seniors store long-term while downsizing"
+  source_type: generic_reasoning
+  confidence: low
+  used_in: [services.py]
+
+# ---------------------------------------------------------------- pricing (company KB)
+hourly_rates:
+  value: {crew_2: {weekday: 119, weekend: 129}, crew_3: {weekday: 159, weekend: 169}, crew_4: {weekday: 199, weekend: 209}}
+  description: Local hourly rate with truck, cash/check
+  source: "Company KB, section 6 (local move rates)"
+  source_type: company_kb
+  confidence: high
+  used_in: [pricing.py]
+
+payment_surcharge_per_hour:
+  value: {cash: 0, venmo: 5, card: 10}
+  description: Hourly rate change by payment method
+  source: "Company KB, section 6"
+  source_type: company_kb
+  confidence: high
+  used_in: [pricing.py]
+
+min_labor_hours:
+  value: 3
+  description: Minimum labor hours on every job (travel separate)
+  source: "Company KB, section 7"
+  source_type: company_kb
+  confidence: high
+  used_in: [pricing.py]
+
+travel_time_multiplier:
+  value: 2
+  description: Travel billed at this multiple of drive time between pickup and drop-off
+  source: "Company KB, section 7 (double drive time under California rules)"
+  source_type: company_kb
+  confidence: high
+  used_in: [pricing.py]
+
+labor_hours_range:
+  value: {single_item: [3, 3], studio: [3, 4], 1br: [4, 6], 2br: [5, 7], 3br: [7, 9], 4br_plus: [8, 11], office_s: [5, 8], office_m: [8, 12], office_l: [12, 18]}
+  description: Typical labor hours by size (uniform draw). Residential from the KB; offices are guesses (the KB gives no office ranges).
+  source: "Company KB, section 8 (typical labor time)"
+  source_type: company_kb
+  confidence: high
+  used_in: [pricing.py, data_quality.py]
+
+labor_only_hours_factor:
+  value: 0.6
+  description: Labor-only jobs (load or unload a customer truck) take this share of full-move hours
+  source: "No truck driving or two-ended handling"
+  source_type: generic_reasoning
+  confidence: low
+  used_in: [pricing.py]
+
+extra_hours:
+  value: {per_stairs_flight: 0.5, per_specialty_item: 0.25, sd: 0.15}
+  description: Extra labor hours for stairs and heavy items, and lognormal noise on total hours
+  source: "KB says extra time applies for stairs and heavy items; amounts are guesses"
+  source_type: generic_reasoning
+  confidence: low
+  used_in: [pricing.py]
+
+specialty_fee:
+  value: {per_group: 175, group_size: 3}
+  description: Flat fee per group of up to 3 specialty or heavy items
+  source: "Company KB, section 3"
+  source_type: company_kb
+  confidence: high
+  used_in: [pricing.py]
+
+storage_free_month_after:
+  value: 6
+  description: Storage longer than this many months gets the first month free
+  source: "Company KB, section 2"
+  source_type: company_kb
+  confidence: high
+  used_in: [pricing.py]
+
+long_distance_rate_per_lb:
+  value: {at_100_miles: 0.50, at_500_miles: 0.80, min_charge: 1500}
+  description: Flat long-distance price = weight x rate (linear in distance), with a minimum charge (the KB gives no rate)
+  source: "2026 cost guides put long-distance moves at about $0.50-$0.80 per lb; minimum charge is a guess"
+  url: "https://www.eeward.com/blog/how-much-does-a-long-distance-move-cost ; https://www.caddymoving.com/blogs/caddy-shack-blog/moving-costs-in-2026-complete-breakdown-estimates-and-ways-to-save"
+  source_type: public
+  confidence: low
+  used_in: [pricing.py]
+
+box_prices:
+  value: {small_box: 1.50, medium_box: 2.25, large_box: 3.00}
+  description: Price per box
+  source: "2026 retailer comparison (small ~$1.08-$1.78, large ~$2.26-$3.00)"
+  url: "https://blog.hireahelper.com/tag/price-comparison/ ; https://greatguysmoving.com/blog/everything-you-need-to-know-about-moving-boxes"
+  source_type: public
+  confidence: medium
+  used_in: [pricing.py]
+
+wardrobe_box_prices:
+  value: {wardrobe_box_20in: 15.00, wardrobe_box_25in: 18.00, wardrobe_box_25in_short: 16.00}
+  description: Price per wardrobe box (sold to keep)
+  source: "Public prices range about $8-$25 per wardrobe box; sizes interpolated"
+  url: "https://blog.hireahelper.com/tag/price-comparison/"
+  source_type: public_derived
+  confidence: medium
+  used_in: [pricing.py]
+
+plastic_wrap_prices:
+  value: {plastic_wrap_13in: 19.00, plastic_wrap_15in: 22.00, plastic_wrap_17in: 25.00}
+  description: Price per roll, scaled by width from a public 20 in roll price
+  source: "U-Haul lists 20 in x 1000 ft stretch wrap at $29.25"
+  url: "https://www.uhaul.com/MovingSupplies/Packing-Supplies/20-Movers-Stretch-Plastic-Wrap?id=740"
+  source_type: public_derived
+  confidence: medium
+  used_in: [pricing.py]
+
+other_supply_prices:
+  value: {tape_clear: 4.50, tape_brown: 4.50, bubble_wrap: 18.00, dish_wrap: 14.00, speed_pack_regular: 25.00, speed_pack_large: 40.00, mattress_bag: 10.00}
+  description: Price per unit (roll, bundle or pack)
+  source: "No reliable public price found for speed packs; others are typical retail"
+  source_type: generic_reasoning
+  confidence: low
+  used_in: [pricing.py]
+
+protection_equipment_prices:
+  value: {floor_protector_paper: 30.00, floor_protector_carpet: 45.00, glass_protector: 12.00, tv_protector: 25.00, stairs_protector: 20.00, strap_elastic: 6.00, strap_regular: 10.00, strap_heavy_duty: 18.00, store_pickup_delivery: 95.00}
+  description: Price per unit for protection, straps, and adding a store pickup to a move
+  source: "Typical retail; store pickup about 45 minutes of crew time"
+  source_type: generic_reasoning
+  confidence: low
+  used_in: [pricing.py]
+
+storage_monthly_rates:
+  value: {storage_5x5: 90, storage_5x10: 140, storage_10x10: 210, storage_10x15: 290, storage_10x20: 360, u_box_5x7: 110}
+  description: Monthly rent. Storage from San Diego County climate-controlled averages (5x10, 10x15 interpolated); U-Box rate is a guess.
+  source: "RentCafe San Diego County climate-controlled: 5x5 ~$86-96, 10x10 ~$206-213, 10x20 ~$357"
+  url: "https://www.rentcafe.com/climate-controlled-storage-units/us/ca/san-diego-county/92154/"
+  source_type: public_derived
+  confidence: medium
+  used_in: [pricing.py]
