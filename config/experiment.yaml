@@ -28,3 +28,15 @@ baselines:
   # segment-popularity term to break ties and to rank empty carts.
   # Grid widened after the first run picked its top edge (1.0); choice is still made on val.
   cooc_prior_weight_grid: [0.01, 0.1, 0.3, 1.0, 3.0, 10.0]
+
+als:
+  iterations: 15
+  # 45 services only: factors near the catalog size just memorise each item (see tests),
+  # and 32 factors costs ~10x the time of 8. So the grid stops at 16.
+  # Grids widened once after the first run chose edges (factors=4, reg=100, prior=10);
+  # the choice is still made on val only.
+  factors_grid: [2, 4, 8, 16]
+  reg_grid: [1, 10, 100, 1000]
+  alpha_grid: [10, 40]
+  prior_weight_grid: [0.1, 0.3, 1.0, 3.0, 10.0, 30.0, 100.0]
+  test_seeds: [0, 1, 2]       # ALS init seeds; test results report mean and spread

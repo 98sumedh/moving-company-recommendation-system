@@ -25,7 +25,7 @@ the norm: recommendations must come from the move profile and the partial cart, 
 |---|---|---|
 | 1 | Synthetic data generator + data-quality report | done (`generator-v1`) |
 | 2 | Time-based split, popularity / segment / co-occurrence baselines | done ([report](reports/baselines.md)) |
-| 3 | Implicit ALS + least-squares fold-in for partial carts | planned |
+| 3 | Implicit ALS + least-squares fold-in for partial carts | done ([report](reports/als.md)) |
 | 4 | Content kNN on move-profile vectors (empty carts) | planned |
 | 5 | Hybrid, weights tuned on validation | planned |
 | 6 | Offline evaluation (HR/Recall@3,5, MAP; ablations; by cart size) | planned |
@@ -39,6 +39,7 @@ make data      # writes data/*.csv (50,000 bookings, seed 42, ~2 s)
 make report    # writes reports/data_quality.md
 make docs      # writes docs/ASSUMPTIONS.md from the YAML
 make baselines # step 2: writes reports/baselines.md and results/baselines.json
+make als       # step 3: writes reports/als.md and results/als.json (a few minutes)
 make test
 ```
 

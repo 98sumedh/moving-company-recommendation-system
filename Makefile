@@ -1,7 +1,7 @@
 PY ?= .venv/bin/python
 SEED ?= 42
 
-.PHONY: setup data report docs baselines test all
+.PHONY: setup data report docs baselines als test all
 
 setup:
 	python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
@@ -18,7 +18,10 @@ docs:
 baselines:
 	PYTHONPATH=src $(PY) -m movrec.run_baselines
 
+als:
+	PYTHONPATH=src $(PY) -m movrec.run_als
+
 test:
 	$(PY) -m pytest -q
 
-all: data report docs baselines test
+all: data report docs baselines als test
