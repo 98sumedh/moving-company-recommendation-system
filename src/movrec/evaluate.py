@@ -80,3 +80,11 @@ def bootstrap_ci(values: np.ndarray, rng: np.random.Generator, n_boot: int = 500
     means = values[idx].mean(axis=1)
     lo, hi = np.quantile(means, [(1 - level) / 2, (1 + level) / 2])
     return float(lo), float(hi)
+
+
+def paired_diff_ci(a: np.ndarray, b: np.ndarray, rng, n_boot: int = 500) -> tuple[float, float, float]:
+    """Mean of a - b over the same cases, with a 95% paired-bootstrap interval."""
+    d = a - b
+    idx = rng.integers(0, len(d), size=(n_boot, len(d)))
+    lo, hi = np.quantile(d[idx].mean(axis=1), [0.025, 0.975])
+    return float(d.mean()), float(lo), float(hi)

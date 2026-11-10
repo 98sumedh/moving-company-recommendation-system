@@ -15,18 +15,10 @@ from movrec import DATA_DIR, PROJECT_ROOT
 from movrec.als import ALSRecommender, ImplicitALS
 from movrec.baselines import CoOccurrence, GlobalPopularity, SegmentPopularity
 from movrec.data import load_experiment_config, load_modeling_data
-from movrec.evaluate import make_cases, per_case_metrics, summarize
-from movrec.report_utils import markdown_table
+from movrec.evaluate import make_cases, paired_diff_ci, per_case_metrics, summarize
+from movrec.report_utils import markdown_table, test_tables
 from movrec.run_baselines import BANNER, evaluate_model, target_columns
 from movrec.split import time_split
-
-
-def paired_diff_ci(a: np.ndarray, b: np.ndarray, rng, n_boot: int = 500) -> tuple[float, float, float]:
-    """Mean of a - b over the same cases, with a 95% paired-bootstrap interval."""
-    d = a - b
-    idx = rng.integers(0, len(d), size=(n_boot, len(d)))
-    lo, hi = np.quantile(d[idx].mean(axis=1), [0.025, 0.975])
-    return float(d.mean()), float(lo), float(hi)
 
 
 def run(data_dir: Path = DATA_DIR, verify: bool = True) -> dict:
@@ -133,23 +125,7 @@ def render(results: dict, cfg: dict) -> str:
         for name, c in r["chosen"].items():
             out.append(f"- Chosen for **{name}**: factors={c['factors']}, reg={c['reg']}, alpha={c['alpha']}, "
                        f"prior weight={c['prior_weight']}.")
-        out += ["", "### Test", ""]
-        rows = []
-        for name, t in r["test"].items():
-            o = next(s for s in t["summary"] if s["cart_size"] == "all")
-            d, lo, hi = t["diff_vs_segment_popularity"]
-            row = {"model": name, "hr@3": o["hr@3"], "hr@5": o["hr@5"], "recall@5": o["recall@5"], map_col: o[map_col],
-                   f"{map_col} vs segment pop (95% CI)": "-" if name == "segment_popularity" else f"{d:+.3f} ({lo:+.3f} to {hi:+.3f})",
-                   "seed spread": "-" if "seed_map" not in t else f"{min(t['seed_map']):.3f}-{max(t['seed_map']):.3f}"}
-            rows.append(row)
-        out += [markdown_table(pd.DataFrame(rows), "{:.3f}"), "",
-                f"### Test by partial-cart size ({map_col} / hr@5)", ""]
-        slices = [s["cart_size"] for s in next(iter(r["test"].values()))["summary"] if s["cart_size"] != "all"]
-        sl = []
-        for name, t in r["test"].items():
-            by = {s["cart_size"]: s for s in t["summary"]}
-            sl.append({"model": name, **{f"cart={s} (n={by[s]['cases']})": f"{by[s][map_col]:.3f} / {by[s]['hr@5']:.3f}" for s in slices}})
-        out += [markdown_table(pd.DataFrame(sl)), ""]
+        out += ["", "### Test", "", *test_tables(r["test"], map_col)]
     return "\n".join(out)
 
 
