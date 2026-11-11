@@ -15,38 +15,169 @@ rules: hourly rates, minimums, travel and specialty-fee rules, crew sizing, serv
 
 ## Problem
 
-At booking time, recommend add-on services (packing, supplies, protection, equipment, specialty
-handling, storage, truck size) from a 45-item catalog. Most customers book once, so cold start is
-the norm: recommendations must come from the move profile and the partial cart, not customer history.
+At booking time, recommend add-on services from a 45-item catalog: truck size, packing
+services, boxes, wrap and tape, surface protection, equipment, furniture disassembly, specialty
+handling (pianos, safes, artwork), climate-controlled storage and containers.
 
-## Status
+Most customers book once (about 96% here), so **cold start is the norm**. Recommendations have to
+come from the move profile (size, access, route, timing) and whatever is already in the cart, not
+from customer history.
 
-| Step | What | Status |
+## Key findings
+
+On the summer-2026 test period (MAP@5, partial carts, items already in the cart excluded):
+
+| Model | All 45 services | Add-ons only (truck excluded) |
 |---|---|---|
-| 1 | Synthetic data generator + data-quality report | done (`generator-v1`) |
-| 2 | Time-based split, popularity / segment / co-occurrence baselines | done ([report](reports/baselines.md)) |
-| 3 | Implicit ALS + least-squares fold-in for partial carts | done ([report](reports/als.md)) |
-| 4 | Content kNN on move-profile vectors (empty carts) | done ([report](reports/content.md)) |
-| 5 | Hybrid, weights tuned on validation | done ([report](reports/hybrid.md)) |
-| 6 | Offline evaluation (HR/Recall@3,5, MAP; ablations; by cart size) | done ([report](reports/evaluation.md)) |
-| 7 | Write-up and limitations | planned |
+| Global popularity | 0.208 | 0.201 |
+| Segment popularity (move type x home size) | 0.334 | 0.240 |
+| Co-occurrence | 0.337 | 0.241 |
+| Implicit ALS alone | 0.217 | 0.201 |
+| ALS + segment prior | 0.343 | 0.241 |
+| Content kNN (tuned feature weights) | 0.337 | 0.241 |
+| **Hybrid (one global weight set)** | **0.343** | **0.246** |
+| Ceiling: generator probabilities, profile only | 0.355 | 0.246 |
+| Ceiling: generator probabilities, true hidden segment | 0.371 | 0.266 |
 
-## Quick start
+1. **A well-built popularity baseline is most of the answer.** Popularity within move type x home
+   size beats global popularity by 0.13 MAP@5. Every later model is judged against it, not against
+   global popularity.
+2. **The hybrid wins, but by a little:** +0.010 MAP@5 on all services and +0.006 on add-ons over
+   segment popularity (paired 95% CIs exclude zero, stable across reveal seeds). On add-ons that is
+   about 2.5% relative.
+3. **ALS adds little here.** On its own it is no better than global popularity: it cannot see the
+   move profile, which carries most of the signal. Combined with the profile prior it adds +0.009 on
+   all services, mostly by predicting the truck from cart contents. On true add-ons its gain is
+   inside the noise, and in the hybrid ablation, dropping it changes nothing measurable.
+4. **Content kNN only works with tuned feature weights.** With equal weights it lost to segment
+   popularity (0.296 vs 0.334), because weak features (payment method, calendar) diluted move type
+   and size. With tuned weights it ties segment popularity and adds a little in the hybrid.
+5. **The remaining room is mostly the hidden segment, not the model.** The hybrid reaches roughly the
+   profile-only ceiling. The gap to the true-segment ceiling (about 0.02 MAP@5) is information no
+   model here can see (whether this is a military move, a student, a downsizing senior). Closing it
+   needs new signal, not a bigger model.
+6. **Many misses are the right product in the wrong size.** Category hit rate at 5 is 0.82 vs 0.70
+   exact-item hit rate on add-ons.
+7. **Including the truck flatters every metric** (MAP@5 0.33 vs 0.24), because home size nearly
+   decides it. Both target sets are reported throughout.
+
+Full numbers: [evaluation](reports/evaluation.md) · [baselines](reports/baselines.md) ·
+[ALS](reports/als.md) · [content kNN](reports/content.md) · [hybrid](reports/hybrid.md) ·
+[data quality](reports/data_quality.md)
+
+## Approach
+
+### 1. Synthetic data ([generator](src/movrec/generator), [report](reports/data_quality.md))
+
+50,000 bookings over 24 months (Oct 2024 to Sep 2026), about 70 jobs a day, the company's real
+volume.
+
+- **Move profile:** move type (local, long distance, commercial, labor-only, single item), home
+  size, square feet, weight, regions within San Diego and Orange counties or up to 500 miles away
+  (CA, NV, AZ), floors, stairs and elevators, crew, payment method, estimate method.
+- **Timing:** monthly seasonality (about 43% of moves in May-Aug, against a public figure of ~41%),
+  month-end and weekend lift, and booking lead times centred on the company's "2-3 weeks ahead".
+- **Add-ons:** each product family gets a log-odds score from base rate, profile effects, a
+  hidden-segment effect and noise. Then co-occurrence lifts, exclusive pairs (full packing vs
+  day-of packing), random adds and drops, a size/variant choice and quantities.
+- **Pricing** follows the company's rules exactly: hourly rate by crew and weekday or weekend,
+  card/Venmo surcharge, 3-hour minimum, travel billed at double drive time, $175 per 3 specialty
+  items, first storage month free over 6 months. Tests reproduce the company's worked examples.
+
+### 2. Guarding against circular evaluation
+
+- **Hidden segments** (military PCS, students, downsizing seniors, collectors, and others) drive
+  tastes but are never in a modeling file. The profile only partly predicts them.
+- **Noise and rarity:** about 70% of exact carts appear only once.
+- **Season shift:** tuning happens on a winter validation period; the test period is the summer
+  peak, when the segment mix is different.
+- **Frozen generator:** calibrated once (cart size only) before any model existed, then tagged
+  `generator-v1`. Every modeling step checks the data's SHA-256 hashes against `MANIFEST.json`.
+  The generator was never changed after seeing model results.
+
+### 3. Split and evaluation protocol ([config](config/experiment.yaml))
+
+- **Split on booking time:** train is bookings made before 2026, validation is Jan-Mar 2026, test
+  is Apr-Sep 2026. A model only learns from bookings made before the ones it scores.
+- **Partial carts:** for each test booking, a random subset of its cart is revealed and the rest is
+  hidden. The cart size runs from 0 (empty) to n-1, so every case has something to predict.
+- **Metrics:** hit rate and recall at 3 and 5, MAP@5, and category hit rate. Items already in the
+  cart are never recommended. Results are sliced by cart size and move type.
+- **Statistics:** differences use paired bootstrap 95% intervals on the same cases. ALS is run with
+  3 initial seeds; the evaluation is repeated on 3 more reveal seeds.
+- **Tuning rule:** every setting is chosen on validation only. Final models are refit on
+  train+validation and scored once on test.
+
+### 4. Models
+
+| Model | Idea | Code |
+|---|---|---|
+| Global / segment popularity | Item frequency, overall or within move type x home size (shrunk toward global for small segments) | [baselines.py](src/movrec/baselines.py) |
+| Co-occurrence | Average P(item \| cart item), plus a segment-popularity prior | [baselines.py](src/movrec/baselines.py) |
+| Implicit ALS + fold-in | Hu-Koren-Volinsky ALS in NumPy. New bookings are **folded in**: their partial cart is solved against the trained service factors with a weighted least-squares step (tested against `np.linalg.lstsq`) | [als.py](src/movrec/als.py) |
+| Content kNN | Move-profile vectors (5 feature groups, truck never a feature), cosine similarity to past bookings, similarity-weighted neighbour carts; feature-group weights tuned on validation | [content.py](src/movrec/content.py) |
+| Hybrid | Weighted sum of the four component scores; weights tuned on validation, either one set or one per cart size | [hybrid.py](src/movrec/hybrid.py) |
+| Ceilings (diagnostic) | The generator's own probabilities, with and without the hidden segment | [oracle.py](src/movrec/oracle.py) |
+
+## Limitations
+
+- **Synthetic data.** The results show the pipeline works and how the methods compare on data with
+  this structure. They say nothing about real lift at the company, and the size of each effect
+  (stairs to stair protector, long distance to storage) is my estimate, not measured.
+- **The generator shapes the winner.** Add-ons here depend mostly on the move profile, with fairly
+  weak cart-to-cart links. That is why popularity by segment is strong and ALS weak. In real data
+  with stronger bundle effects, ALS or co-occurrence could matter more.
+- **Offline only.** There is no A/B test, no position bias, and no check of whether a recommendation
+  causes a purchase rather than predicting one the customer would make anyway.
+- **The reveal protocol is an assumption.** Real carts are built in an order (truck and packing
+  first, supplies later); here the revealed items are random. Results by cart size help, but
+  order effects are not modeled.
+- **The ceilings are approximate.** They integrate the noise analytically and ignore some
+  interactions, so the profile-only ceiling is a reference point, not a strict bound (the hybrid
+  beats it on commercial moves).
+- **Small catalog.** With 45 items, matrix factorisation has little to compress; ALS factor counts
+  near the catalog size simply memorise items.
+- **Search limits.** Grids were widened once per step when the first run chose an edge (noted in
+  each report). The hybrid's per-cart-size weights still show edge flags. These come from the fact
+  that only weight ratios matter, and they were not chased further to avoid tuning to noise.
+- **Not modeled:** prices and margin in the ranking (free items such as dollies count the same as
+  paid ones), quantities, and cancellations (cancelled bookings keep their quoted cart).
+
+## What I'd do next
+
+1. **A learning-to-rank model on profile + cart features.** For example, gradient-boosted trees or
+   per-item logistic regression, scoring (booking, item) pairs with features such as stairs, long
+   distance, month, cart contents, and the hybrid's own component scores. kNN averages over
+   hundreds of neighbours and dilutes single-feature effects (stairs to stair protector); a ranker
+   learns them directly. This is the most likely real gain.
+2. **Business-aware ranking:** weight by margin, keep free items from crowding out paid ones, and
+   recommend at the product-family level, then pick the size.
+3. **New signal for the hidden segment:** for example, military or student indicators, the
+   quote-form text, or the chatbot conversation. The ceilings say this is where the remaining room is.
+4. **Online test** once deployed: an A/B test on add-on attach rate and revenue per booking, with
+   guardrails on cancellations.
+5. **Two-tower models only if the catalog or features grow** (hundreds of items, free text,
+   images). At 45 items and a few dozen features they would add complexity without a clear payoff.
+
+## Reproduce
 
 ```bash
-make setup     # venv + dependencies
-make data      # writes data/*.csv (50,000 bookings, seed 42, ~2 s)
-make report    # writes reports/data_quality.md
-make docs      # writes docs/ASSUMPTIONS.md from the YAML
-make baselines # step 2: writes reports/baselines.md and results/baselines.json
-make als       # step 3: writes reports/als.md and results/als.json (a few minutes)
-make content   # step 4: writes reports/content.md and results/content.json (~2 min)
-make hybrid    # step 5: writes reports/hybrid.md and results/hybrid.json (~1 min)
-make evaluation # step 6: writes reports/evaluation.md and results/evaluation.json (~2 min)
-make test
+make setup       # venv + dependencies
+make data        # data/*.csv: 50,000 bookings, seed 42 (~2 s); hashes match data/MANIFEST.json
+make report      # reports/data_quality.md
+make docs        # docs/ASSUMPTIONS.md from the YAML
+make baselines   # step 2 (~10 s)
+make als         # step 3 (~3 min)
+make content     # step 4 (~2 min)
+make hybrid      # step 5 (~1 min)
+make evaluation  # step 6 (~2 min)
+make test        # 74 tests
 ```
 
-## Data
+Each step writes `reports/<step>.md` and `results/<step>.json`. Later steps read earlier steps'
+chosen settings from `results/`, so run them in order (or `make all`).
+
+## Data files
 
 | File | Contents |
 |---|---|
@@ -54,31 +185,17 @@ make test
 | `customers.csv` | customer_id, customer_type, first booking, number of bookings |
 | `bookings.csv` | one row per booking: timing, move type, size, weight, route, access, crew, truck, payment, hours, prices, status |
 | `booking_services.csv` | cart lines: booking_id, service_id, quantity, line_price |
-| `_hidden/segments.csv` | hidden segment per booking, **diagnostics only**, never used for modeling |
+| `_hidden/segments.csv` | hidden segment per booking: **diagnostics and ceilings only**, never used by a model |
 | `MANIFEST.json` | seed, generator commit, row counts and SHA-256 of every file |
-
-Cancelled bookings keep their quoted cart (the cart existed at booking time); use `status` to filter.
-
-## How the generator avoids circular evaluation
-
-- **Hidden segments** (military PCS, students, seniors downsizing, collectors, and others) drive
-  add-on tastes but are not in any modeling file. The observable profile only partly predicts them.
-- **Noise and rare combinations:** per-booking and per-item noise, random adds and drops, rare
-  segments. About 70% of exact carts appear only once.
-- **Cold start:** about 96% of customers book once.
-- **Season shift:** the segment mix changes by month (military and students in summer, seniors in
-  winter), so a later test period differs from training.
-- **Frozen generator:** calibrated once (cart size only) before any model existed. After review it
-  is tagged `generator-v1`; later steps check the manifest hashes. Any change needs a new tag and a
-  business reason in the changelog, never "the model scored badly".
 
 ## Repo layout
 
 ```
-config/            assumptions.yaml (every number + source), catalog.yaml (structure)
-src/movrec/        assumptions.py, catalog.py, data_quality.py
+config/                assumptions.yaml (every generator number + source), catalog.yaml, experiment.yaml
 src/movrec/generator/  profiles, segments, timeline, services (add-ons), pricing, generate
-scripts/           generate_data.py
-reports/           data_quality.md
-tests/             pytest suite (pricing reproduces the knowledge-base examples)
+src/movrec/            data, split, evaluate, baselines, als, content, hybrid, oracle, run_* (one per step)
+reports/               one markdown report per step
+results/               one JSON file per step (chosen settings + metrics)
+tests/                 pytest suite
+docs/ASSUMPTIONS.md    readable table of every assumption
 ```
